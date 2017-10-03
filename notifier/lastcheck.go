@@ -8,6 +8,10 @@ import (
 	"github.com/zmb3/spotify"
 )
 
+// getLastCheck returns the last time the playlist was checked for new tracks.
+//
+// If the lastcheck file is present, the value from the file is returned.
+// Otherwise, the beginning of time is returned (year 0000...)
 func getLastCheck() (*time.Time, error) {
 	var (
 		err       error
@@ -29,6 +33,7 @@ func getLastCheck() (*time.Time, error) {
 	return &lastCheck, err
 }
 
+// setLastCheck persists the specified time to the file system.
 func setLastCheck(lastCheckTime time.Time) error {
 	formattedTime := []byte(lastCheckTime.Format(spotify.TimestampLayout))
 	return ioutil.WriteFile(lastCheckFileName, formattedTime, 0644)
