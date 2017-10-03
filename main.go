@@ -14,18 +14,13 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// Log into spotify
-// Log into slack
-// Check playlist
-// Anything new?
-// If so, post it!
-
 const (
 	redirectURI          = "http://localhost:8080/callback"
 	channelName          = "tests"
 	botName              = "New Sick Beats!"
 	spotifyPlaylist      = "SickBeetz"
 	spotifyTokenFileName = ".spotifytoken"
+	lastCheckFileName    = ".lastcheck"
 )
 
 var (
@@ -64,7 +59,11 @@ func main() {
 	}
 
 	ticker := time.NewTicker(60 * time.Second)
-	lastCheck := time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
+	var lastCheck *time.Time
+	lastCheck, err = getLastCheck()
+	if err != nil {
+		log.Fatalf("error occured getting lastCheck date: %v", err)
+	}
 	for now := range ticker.C {
 		for _, track := range playlistTracksPage.Tracks {
 			trackAdded, _ := time.Parse(spotify.TimestampLayout, track.AddedAt)
@@ -80,7 +79,10 @@ func main() {
 				}
 			}
 		}
-		lastCheck = now.UTC()
+		err = setLastCheck(now.UTC())
+		if err != nil {
+			log.Fatalf("error setting last check time: %v", err)
+		}
 		fmt.Println("-----------------------------------------")
 	}
 }
@@ -159,4 +161,30 @@ func saveToken(token *oauth2.Token) error {
 		}
 	}
 	return err
+}
+
+func getLastCheck() (*time.Time, error) {
+	var (
+		err       error
+		rawDate   []byte
+		lastCheck time.Time
+	)
+	_, err = os.Stat(lastCheckFileName)
+	if err != nil {
+		if os.IsNotExist(err) {
+			nowUTC := time.Now().UTC()
+			return &nowUTC, nil
+		}
+		return nil, err
+	}
+
+	if rawDate, err = ioutil.ReadFile(lastCheckFileName); err == nil {
+		lastCheck, err = time.Parse(spotify.TimestampLayout, string(rawDate))
+	}
+	return &lastCheck, err
+}
+
+func setLastCheck(lastCheckTime time.Time) error {
+	formattedTime := []byte(lastCheckTime.Format(spotify.TimestampLayout))
+	return ioutil.WriteFile(lastCheckFileName, formattedTime, 0644)
 }
