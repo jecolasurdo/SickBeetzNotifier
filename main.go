@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/nlopes/slack"
 	"github.com/zmb3/spotify"
+	"golang.org/x/oauth2"
 )
 
 // Log into spotify
@@ -20,43 +20,27 @@ import (
 const (
 	redirectURI     = "http://localhost:8080/callback"
 	channelName     = "tests"
-	botName         = "SlackPlaylistNotifier"
-	spotifyUser     = "127658174"
-	playlistOwner   = "barsae"
+	botName         = "New Sick Beats!"
 	spotifyPlaylist = "SickBeetz"
 )
 
 var (
 	auth  = spotify.NewAuthenticator(redirectURI, spotify.ScopePlaylistReadCollaborative)
-	ch    = make(chan *spotify.spotifyClient)
+	ch    = make(chan *spotify.Client)
 	state = "abc123"
 )
 
+// main is the entrypoint for the program
+//
+// Will panic if expected environment variables are not set (see settings.go)
 func main() {
-	slackAPI := slack.New(os.Getenv("SLACK_TOKEN"))
+	s := initializeSettings()
+	slackAPI := slack.New(s.SlackToken)
+	spotifyClient := startSpotifyAuthorization()
 
-	// Spotify Auth
-	http.HandleFunc("/callback", completeAuth)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Got request for:", r.URL.String())
-	})
-	go http.ListenAndServe(":8080", nil)
-	url := auth.AuthURL(state)
-	fmt.Println("Please log in to Spotify by visiting the following page in your browser:", url)
-
-	spotifyClient := <-ch
-
-	// If we're here, we're ready to do stuff...
-
-	user, err := spotifyClient.CurrentUser()
+	playlistPage, err := spotifyClient.GetPlaylistsForUser(s.SpotifyUser)
 	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("You are logged in as:", user.ID)
-
-	playlistPage, err := spotifyClient.GetPlaylistsForUser(spotifyUser)
-	if err != nil {
-		log.Fatalf("Couldn't get playlists for %v: %v", spotifyUser, err)
+		log.Fatalf("Couldn't get playlists for %v: %v", s.SpotifyUser, err)
 	}
 
 	var selectedPlaylist *spotify.SimplePlaylist
@@ -70,17 +54,18 @@ func main() {
 		log.Fatalf("playlist not found.")
 	}
 
-	playlistTracksPage, err := spotifyClient.GetPlaylistTracks(playlistOwner, selectedPlaylist.ID)
+	playlistTracksPage, err := spotifyClient.GetPlaylistTracks(s.PlaylistOwner, selectedPlaylist.ID)
 	if err != nil {
 		log.Fatalf("error getting tracks for playlist: %v", err)
 	}
 
-	ticker := time.NewTicker(time.Minute)
+	ticker := time.NewTicker(60 * time.Second)
 	lastCheck := time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
 	for now := range ticker.C {
-		fmt.Println(lastCheck)
 		for _, track := range playlistTracksPage.Tracks {
-			if trackAdded, _ := time.Parse(spotify.TimestampLayout, track.AddedAt); trackAdded.After(lastCheck) {
+			trackAdded, _ := time.Parse(spotify.TimestampLayout, track.AddedAt)
+			fmt.Printf("Track: %v\nAdded: %v\nLast Check: %v\n-----------\n", track.Track.Name, trackAdded, lastCheck)
+			if track.AddedAt > lastCheck.Format(spotify.TimestampLayout) {
 				msg := fmt.Sprintf("%v", track.Track.Name)
 				params := slack.PostMessageParameters{
 					Username: botName,
@@ -91,9 +76,30 @@ func main() {
 				}
 			}
 		}
-		lastCheck = now
+		lastCheck = now.UTC()
+		fmt.Println("-----------------------------------------")
+	}
+}
+
+func startSpotifyAuthorization() *spotify.Client {
+	token, err := retrieveToken()
+	if err != nil {
+		log.Fatalf("error checking for existing token: %v", err)
+	}
+	if token != nil {
+		client := auth.NewClient(token)
+		log.Println("Found existing token!")
+		return &client
 	}
 
+	http.HandleFunc("/callback", completeAuth)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Got request for:", r.URL.String())
+	})
+	go http.ListenAndServe(":8080", nil)
+	url := auth.AuthURL(state)
+	fmt.Println("Please log in to Spotify by visiting the following page in your browser:", url)
+	return <-ch
 }
 
 func completeAuth(w http.ResponseWriter, r *http.Request) {
@@ -106,8 +112,26 @@ func completeAuth(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		log.Fatalf("State mismatch: %s != %s\n", st, state)
 	}
-	// use the token to get an authenticated spotifyClient
-	spotifyClient := auth.NewspotifyClient(tok)
+	spotifyClient := auth.NewClient(tok)
+
+	err = saveToken(tok)
+	if err != nil {
+		log.Fatalf("error trying to save token for later use:, %v", err)
+	}
+
 	fmt.Fprintf(w, "Login Completed!")
 	ch <- &spotifyClient
+}
+
+// retrieveToken is not implmented, but it would be nice if the token was persisted so we don't have to do
+// an OAUTH http request every time the program is initiated.
+// This authorization shortcoming is why the program currently has it's own internal ticker
+// rather than just relying on an external scheduler, which would be preferrable.
+func retrieveToken() (*oauth2.Token, error) {
+	return nil, nil
+}
+
+// saveToken is not implemented. See notes about retrieveToken.
+func saveToken(token *oauth2.Token) error {
+	return nil
 }
