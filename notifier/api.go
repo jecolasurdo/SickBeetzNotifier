@@ -24,7 +24,7 @@ func Run(settings *Settings) {
 	slackAPI := slack.New(settings.SlackToken)
 	spotifyClient := spotifyauth.Authorize()
 
-	ticker := time.NewTicker(60 * time.Second)
+	ticker := time.NewTicker(20 * time.Second)
 	for now := range ticker.C {
 		log.Println("Poll")
 		playlistPage, err := spotifyClient.GetPlaylistsForUser(settings.SpotifyUser)
@@ -54,9 +54,8 @@ func Run(settings *Settings) {
 			log.Fatalf("error occured getting lastCheck date: %v", err)
 		}
 		for _, track := range playlistTracksPage.Tracks {
-			//fmt.Printf("AddedAt: %v\tLastCheck: %v\t", track.AddedAt, lastCheck.Format(spotify.TimestampLayout))
 			if track.AddedAt > lastCheck.Format(spotify.TimestampLayout) {
-				msg := fmt.Sprintf("%v just shared a new track! Check it out! %v", track.AddedBy.DisplayName, track.Track.URI)
+				msg := fmt.Sprintf("Someone just shared a new track!\n%v\nCheck it out! %v", track.Track.Name, settings.PlaylistURI)
 				params := slack.PostMessageParameters{
 					Username: botName,
 				}

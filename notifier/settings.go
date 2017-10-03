@@ -9,6 +9,7 @@ type Settings struct {
 	PlaylistOwner string
 	SpotifyID     string
 	SpotifySecret string
+	PlaylistURI   string
 }
 
 // InitializeSettingsFromEnvVars initializes settings from environment variables.
@@ -20,12 +21,14 @@ func InitializeSettingsFromEnvVars() *Settings {
 		SpotifyUser:   os.Getenv("SPOTIFY_USER"),
 		SpotifyID:     os.Getenv("SPOTIFY_ID"),
 		SpotifySecret: os.Getenv("SPOTIFY_SECRET"),
+		PlaylistURI:   os.Getenv("PLAYLIST_URI"),
 	}
 	if s.PlaylistOwner == "" ||
 		s.SlackToken == "" ||
 		s.SpotifyID == "" ||
 		s.SpotifySecret == "" ||
-		s.SpotifyUser == "" {
+		s.SpotifyUser == "" ||
+		s.PlaylistURI == "" {
 		panic("One or more expected environment variables not set.")
 	}
 	return &s
