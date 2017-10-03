@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/nlopes/slack"
@@ -18,10 +21,11 @@ import (
 // If so, post it!
 
 const (
-	redirectURI     = "http://localhost:8080/callback"
-	channelName     = "tests"
-	botName         = "New Sick Beats!"
-	spotifyPlaylist = "SickBeetz"
+	redirectURI          = "http://localhost:8080/callback"
+	channelName          = "tests"
+	botName              = "New Sick Beats!"
+	spotifyPlaylist      = "SickBeetz"
+	spotifyTokenFileName = ".spotifytoken"
 )
 
 var (
@@ -123,15 +127,36 @@ func completeAuth(w http.ResponseWriter, r *http.Request) {
 	ch <- &spotifyClient
 }
 
-// retrieveToken is not implmented, but it would be nice if the token was persisted so we don't have to do
-// an OAUTH http request every time the program is initiated.
-// This authorization shortcoming is why the program currently has it's own internal ticker
-// rather than just relying on an external scheduler, which would be preferrable.
 func retrieveToken() (*oauth2.Token, error) {
-	return nil, nil
+	var (
+		err             error
+		serializedToken []byte
+		token           oauth2.Token
+	)
+	_, err = os.Stat(spotifyTokenFileName)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if serializedToken, err = ioutil.ReadFile(spotifyTokenFileName); err == nil {
+		err = json.Unmarshal(serializedToken, &token)
+	}
+
+	return &token, err
 }
 
-// saveToken is not implemented. See notes about retrieveToken.
 func saveToken(token *oauth2.Token) error {
-	return nil
+	var (
+		err             error
+		f               *os.File
+		serializedToken []byte
+	)
+	if f, err = os.Create(spotifyTokenFileName); err == nil {
+		if serializedToken, err = json.Marshal(*token); err == nil {
+			_, err = f.Write(serializedToken)
+		}
+	}
+	return err
 }
