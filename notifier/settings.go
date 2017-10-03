@@ -2,8 +2,8 @@ package notifier
 
 import "os"
 
-// Settings represents the core settings required for the application to integrate with Slack and Spotify
-type Settings struct {
+// BaseSettings represents the core settings required for the application to integrate with Slack and Spotify
+type BaseSettings struct {
 	SlackToken    string
 	SpotifyUser   string
 	PlaylistOwner string
@@ -14,8 +14,8 @@ type Settings struct {
 
 // InitializeSettingsFromEnvVars initializes settings from environment variables.
 // Panics if any variables are not set.
-func InitializeSettingsFromEnvVars() *Settings {
-	s := Settings{
+func InitializeSettingsFromEnvVars() *BaseSettings {
+	s := BaseSettings{
 		PlaylistOwner: os.Getenv("PLAYLIST_OWNER"),
 		SlackToken:    os.Getenv("SLACK_TOKEN"),
 		SpotifyUser:   os.Getenv("SPOTIFY_USER"),

@@ -4,5 +4,6 @@ import "github.com/jecolasurdo/sickbeetznotifier/notifier"
 
 func main() {
 	s := notifier.InitializeSettingsFromEnvVars()
-	notifier.Run(s)
+	n := notifier.New(s)
+	n.Run()
 }
