@@ -1,22 +1,25 @@
-package main
+package notifier
 
 import "os"
 
-type settings struct {
+// Settings represents the core settings required for the application to integrate with Slack and Spotify
+type Settings struct {
 	SlackToken    string
-	SpotifyID     string
-	SpotifySecret string
 	SpotifyUser   string
 	PlaylistOwner string
+	SpotifyID     string
+	SpotifySecret string
 }
 
-func initializeSettings() *settings {
-	s := settings{
+// InitializeSettingsFromEnvVars initializes settings from environment variables.
+// Panics if any variables are not set.
+func InitializeSettingsFromEnvVars() *Settings {
+	s := Settings{
 		PlaylistOwner: os.Getenv("PLAYLIST_OWNER"),
 		SlackToken:    os.Getenv("SLACK_TOKEN"),
+		SpotifyUser:   os.Getenv("SPOTIFY_USER"),
 		SpotifyID:     os.Getenv("SPOTIFY_ID"),
 		SpotifySecret: os.Getenv("SPOTIFY_SECRET"),
-		SpotifyUser:   os.Getenv("SPOTIFY_USER"),
 	}
 	if s.PlaylistOwner == "" ||
 		s.SlackToken == "" ||
