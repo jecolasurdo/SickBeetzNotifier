@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/nlopes/slack"
 	"github.com/zmb3/spotify"
@@ -21,26 +22,18 @@ const (
 	channelName     = "tests"
 	botName         = "SlackPlaylistNotifier"
 	spotifyUser     = "127658174"
+	playlistOwner   = "barsae"
 	spotifyPlaylist = "SickBeetz"
 )
 
 var (
 	auth  = spotify.NewAuthenticator(redirectURI, spotify.ScopePlaylistReadCollaborative)
-	ch    = make(chan *spotify.Client)
+	ch    = make(chan *spotify.spotifyClient)
 	state = "abc123"
 )
 
 func main() {
-	// Slack Auth
-	api := slack.New(os.Getenv("SLACK_TOKEN"))
-	params := slack.PostMessageParameters{
-		Username: botName,
-	}
-	_, _, err := api.PostMessage(channelName, "Hello world", params)
-	if err != nil {
-		fmt.Println("Error sending message to channel")
-		fmt.Println(err)
-	}
+	slackAPI := slack.New(os.Getenv("SLACK_TOKEN"))
 
 	// Spotify Auth
 	http.HandleFunc("/callback", completeAuth)
@@ -51,17 +44,17 @@ func main() {
 	url := auth.AuthURL(state)
 	fmt.Println("Please log in to Spotify by visiting the following page in your browser:", url)
 
-	client := <-ch
+	spotifyClient := <-ch
 
 	// If we're here, we're ready to do stuff...
 
-	user, err := client.CurrentUser()
+	user, err := spotifyClient.CurrentUser()
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("You are logged in as:", user.ID)
 
-	playlistPage, err := client.GetPlaylistsForUser(spotifyUser)
+	playlistPage, err := spotifyClient.GetPlaylistsForUser(spotifyUser)
 	if err != nil {
 		log.Fatalf("Couldn't get playlists for %v: %v", spotifyUser, err)
 	}
@@ -74,11 +67,32 @@ func main() {
 		}
 	}
 	if selectedPlaylist == nil {
-		log.Fatalf("Playlist not found.")
+		log.Fatalf("playlist not found.")
 	}
 
-	fmt.Println(selectedPlaylist.Name)
-	fmt.Printf("Number of tracks: %v", selectedPlaylist.Tracks.Total)
+	playlistTracksPage, err := spotifyClient.GetPlaylistTracks(playlistOwner, selectedPlaylist.ID)
+	if err != nil {
+		log.Fatalf("error getting tracks for playlist: %v", err)
+	}
+
+	ticker := time.NewTicker(time.Minute)
+	lastCheck := time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
+	for now := range ticker.C {
+		fmt.Println(lastCheck)
+		for _, track := range playlistTracksPage.Tracks {
+			if trackAdded, _ := time.Parse(spotify.TimestampLayout, track.AddedAt); trackAdded.After(lastCheck) {
+				msg := fmt.Sprintf("%v", track.Track.Name)
+				params := slack.PostMessageParameters{
+					Username: botName,
+				}
+				_, _, err := slackAPI.PostMessage(channelName, msg, params)
+				if err != nil {
+					log.Fatalf("error sending message to channel: %v", err)
+				}
+			}
+		}
+		lastCheck = now
+	}
 
 }
 
@@ -92,8 +106,8 @@ func completeAuth(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		log.Fatalf("State mismatch: %s != %s\n", st, state)
 	}
-	// use the token to get an authenticated client
-	client := auth.NewClient(tok)
+	// use the token to get an authenticated spotifyClient
+	spotifyClient := auth.NewspotifyClient(tok)
 	fmt.Fprintf(w, "Login Completed!")
-	ch <- &client
+	ch <- &spotifyClient
 }
