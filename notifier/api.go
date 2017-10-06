@@ -3,6 +3,7 @@ package notifier
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"time"
 
 	"github.com/jecolasurdo/sickbeetznotifier/notifier/spotifyauth"
@@ -11,7 +12,7 @@ import (
 )
 
 const (
-	channelName       = "tests"
+	channelName       = "sickbeats"
 	botName           = "New Sick Beats!"
 	spotifyPlaylist   = "SickBeetz"
 	lastCheckFileName = ".lastcheck"
@@ -35,7 +36,7 @@ func New(settings *BaseSettings) *Notifier {
 
 // Run begins polling spotify for playlist changes and sends messages to slack when new songs are added.
 func (n *Notifier) Run() {
-	ticker := time.NewTicker(20 * time.Second)
+	ticker := time.NewTicker(30 * time.Second)
 	for now := range ticker.C {
 		log.Println("Poll")
 		n.checkSpotifyAndPostToSlack(now)
@@ -43,7 +44,10 @@ func (n *Notifier) Run() {
 }
 
 func (n *Notifier) checkSpotifyAndPostToSlack(now time.Time) {
-	var err error
+	var (
+		addedBy *spotify.User
+		err     error
+	)
 	playlistTracksPage := n.getPlaylistTracks()
 	var lastCheck *time.Time
 	lastCheck, err = getLastCheck()
@@ -52,11 +56,27 @@ func (n *Notifier) checkSpotifyAndPostToSlack(now time.Time) {
 	}
 	for _, track := range playlistTracksPage.Tracks {
 		if track.AddedAt > lastCheck.Format(spotify.TimestampLayout) {
-			msg := fmt.Sprintf("Someone just shared a new track!\n%v\nCheck it out! %v", track.Track.Name, n.Settings.PlaylistURI)
-			params := slack.PostMessageParameters{
-				Username: botName,
+			addedBy, err = n.SpotifyClient.GetUsersPublicProfile(spotify.ID(track.AddedBy.ID))
+			if err != nil {
+				log.Fatalf("error retrieving user information%v", err)
 			}
-			_, _, err := n.SlackAPI.PostMessage(channelName, msg, params)
+			trackURL := fmt.Sprintf("https://open.spotify.com/track/%v", track.Track.ID)
+			var audioFeatures []*spotify.AudioFeatures
+			audioFeatures, err = n.SpotifyClient.GetAudioFeatures(track.Track.ID)
+			if err != nil {
+				log.Println(err)
+			}
+			nifty := ""
+			if len(audioFeatures) > 0 {
+				nifty = niftyComment(audioFeatures[0])
+			}
+			msg := fmt.Sprintf("%v just shared a new track!%v\n%v", addedBy.DisplayName, nifty, trackURL)
+			params := slack.PostMessageParameters{
+				Username:    botName,
+				UnfurlLinks: true,
+				UnfurlMedia: true,
+			}
+			_, _, err = n.SlackAPI.PostMessage(channelName, msg, params)
 			if err != nil {
 				log.Fatalf("error sending message to channel: %v", err)
 			}
@@ -90,4 +110,37 @@ func (n *Notifier) getPlaylistTracks() *spotify.PlaylistTrackPage {
 		log.Fatalf("error getting tracks for playlist: %v", err)
 	}
 	return playlistTracksPage
+}
+
+func niftyComment(track *spotify.AudioFeatures) string {
+	comments := []string{}
+
+	if track.Danceability >= 0.9 {
+		comments = append(comments, "\nGet your dance shoes on!")
+	}
+
+	if track.Danceability <= 0.1 {
+		comments = append(comments, "\nChill selection. Very chill.")
+	}
+
+	if track.Valence >= 0.9 {
+		comments = append(comments, "\nSomeone's feeling happy today!")
+	}
+
+	if track.Valence <= 0.1 {
+		comments = append(comments, "\nOooh, very contemplative...")
+	}
+
+	if len(comments) == 0 {
+		return ""
+	}
+
+	if len(comments) == 1 {
+		return comments[0]
+	}
+
+	rand.Seed(time.Now().UnixNano())
+	i := rand.Intn(len(comments) - 1)
+
+	return comments[i]
 }
