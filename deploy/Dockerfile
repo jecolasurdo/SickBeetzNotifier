@@ -26,6 +26,7 @@ RUN mkdir /bin/sbn
 RUN mkdir -p /build/src/github.com/jecolasurdo/sickbeetznotifier
 WORKDIR /build/src/github.com/jecolasurdo/sickbeetznotifier
 COPY . /build/src/github.com/jecolasurdo/sickbeetznotifier
+RUN mv /build/src/github.com/jecolasurdo/sickbeetznotifier/.lastcheck /bin/sbn/.lastcheck
 RUN dep ensure && go install 
 
 EXPOSE 8080
