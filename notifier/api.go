@@ -6,15 +6,11 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/jecolasurdo/sickbeetznotifier/notifier/spotifyauth"
 	"github.com/nlopes/slack"
 	"github.com/zmb3/spotify"
 )
 
 const (
-	channelName       = "sickbeats"
-	botName           = "New Sick Beats!"
-	spotifyPlaylist   = "SickBeetz"
 	lastCheckFileName = ".lastcheck"
 )
 
@@ -22,25 +18,21 @@ const (
 type Notifier struct {
 	SlackAPI      *slack.Client
 	SpotifyClient *spotify.Client
-	Settings      *BaseSettings
+	Settings      *Settings
 }
 
 // New returns a reference to a Notifier
-func New(settings *BaseSettings) *Notifier {
+func New(settings *Settings) *Notifier {
 	return &Notifier{
 		SlackAPI:      slack.New(settings.SlackToken),
-		SpotifyClient: spotifyauth.Authorize(),
+		SpotifyClient: Authorize(settings),
 		Settings:      settings,
 	}
 }
 
 // Run begins polling spotify for playlist changes and sends messages to slack when new songs are added.
 func (n *Notifier) Run() {
-	ticker := time.NewTicker(30 * time.Second)
-	for now := range ticker.C {
-		log.Println("Poll")
-		n.checkSpotifyAndPostToSlack(now)
-	}
+	n.checkSpotifyAndPostToSlack(time.Now().UTC())
 }
 
 func (n *Notifier) checkSpotifyAndPostToSlack(now time.Time) {
@@ -72,11 +64,11 @@ func (n *Notifier) checkSpotifyAndPostToSlack(now time.Time) {
 			}
 			msg := fmt.Sprintf("%v just shared a new track!%v\n%v", addedBy.DisplayName, nifty, trackURL)
 			params := slack.PostMessageParameters{
-				Username:    botName,
+				Username:    n.Settings.SlackBotName,
 				UnfurlLinks: true,
 				UnfurlMedia: true,
 			}
-			_, _, err = n.SlackAPI.PostMessage(channelName, msg, params)
+			_, _, err = n.SlackAPI.PostMessage(n.Settings.SlackChannelName, msg, params)
 			if err != nil {
 				log.Fatalf("error sending message to channel: %v", err)
 			}
@@ -96,7 +88,7 @@ func (n *Notifier) getPlaylistTracks() *spotify.PlaylistTrackPage {
 
 	var selectedPlaylist *spotify.SimplePlaylist
 	for _, playlist := range playlistPage.Playlists {
-		if playlist.Name == spotifyPlaylist {
+		if playlist.Name == n.Settings.SpotifyPlaylistName {
 			selectedPlaylist = &playlist
 			break
 		}
@@ -105,7 +97,7 @@ func (n *Notifier) getPlaylistTracks() *spotify.PlaylistTrackPage {
 		log.Fatalf("playlist not found.")
 	}
 
-	playlistTracksPage, err := n.SpotifyClient.GetPlaylistTracks(n.Settings.PlaylistOwner, selectedPlaylist.ID)
+	playlistTracksPage, err := n.SpotifyClient.GetPlaylistTracks(n.Settings.SpotifyPlaylistOwner, selectedPlaylist.ID)
 	if err != nil {
 		log.Fatalf("error getting tracks for playlist: %v", err)
 	}

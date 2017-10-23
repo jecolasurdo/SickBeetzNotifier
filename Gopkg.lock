@@ -8,6 +8,18 @@
   revision = "130e6b02ab059e7b717a096f397c5b60111cae74"
 
 [[projects]]
+  name = "github.com/kelseyhightower/envconfig"
+  packages = ["."]
+  revision = "f611eb38b3875cc3bd991ca91c51d06446afa14c"
+  version = "v1.3.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/nlopes/slack"
+  packages = ["."]
+  revision = "5cde21b8b96a43fc3435a1f514123d14fd7eabdc"
+
+[[projects]]
   branch = "master"
   name = "github.com/zmb3/spotify"
   packages = ["."]
@@ -16,13 +28,13 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
-  packages = ["context","context/ctxhttp"]
+  packages = ["context","context/ctxhttp","websocket"]
   revision = "0a9397675ba34b2845f758fe3cd68828369c6517"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/oauth2"
-  packages = [".","clientcredentials","internal"]
+  packages = [".","internal"]
   revision = "bb50c06baba3d0c76f9d125c0719093e315b5b44"
 
 [[projects]]
@@ -34,6 +46,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "7fbe236a88bbaaa9342d542bb78db2d91daa2d39db665b28483d848e4d9e2a31"
+  inputs-digest = "443784b98d7a9fd8aaaa11845e1a8e64d0c131569a5328cbcd8b4620babd3cc9"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -1,4 +1,4 @@
-package spotifyauth
+package notifier
 
 import (
 	"encoding/json"
@@ -13,12 +13,11 @@ import (
 )
 
 const (
-	redirectURI          = "http://localhost:8080/callback"
 	spotifyTokenFileName = ".spotifytoken"
 )
 
 var (
-	auth  = spotify.NewAuthenticator(redirectURI, spotify.ScopePlaylistReadCollaborative)
+	auth  spotify.Authenticator
 	ch    = make(chan *spotify.Client)
 	state = "abc123"
 )
@@ -28,17 +27,18 @@ var (
 // First attempts to find an existing token locally.
 // If no token is found locally, the user is prompted to authorize at a URL.
 // The method blocks until authorization is complete.
-func Authorize() *spotify.Client {
+func Authorize(s *Settings) *spotify.Client {
 	token, err := retrieveToken()
 	if err != nil {
 		log.Fatalf("error checking for existing token: %v", err)
 	}
 	if token != nil {
+
 		client := auth.NewClient(token)
 		log.Println("Found existing token!")
 		return &client
 	}
-
+	auth = spotify.NewAuthenticator(s.SpotifyRedirectURI, spotify.ScopePlaylistReadCollaborative)
 	http.HandleFunc("/callback", completeAuth)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		log.Println("Got request for:", r.URL.String())

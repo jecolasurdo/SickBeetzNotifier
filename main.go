@@ -1,6 +1,8 @@
 package main
 
-import "github.com/jecolasurdo/sickbeetznotifier/notifier"
+import (
+	"github.com/jecolasurdo/sickbeetznotifier/notifier"
+)
 
 func main() {
 	s := notifier.InitializeSettingsFromEnvVars()
