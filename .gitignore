@@ -4,3 +4,4 @@ debug
 vendor/
 .spotifytoken
 .lastcheck
+rundocker.sh
