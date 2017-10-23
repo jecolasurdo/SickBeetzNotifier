@@ -10,10 +10,6 @@ import (
 	"github.com/zmb3/spotify"
 )
 
-const (
-	lastCheckFileName = ".lastcheck"
-)
-
 // Notifier constains components necessary for Spotify to talk to Slack
 type Notifier struct {
 	SlackAPI      *slack.Client
@@ -42,7 +38,7 @@ func (n *Notifier) checkSpotifyAndPostToSlack(now time.Time) {
 	)
 	playlistTracksPage := n.getPlaylistTracks()
 	var lastCheck *time.Time
-	lastCheck, err = getLastCheck()
+	lastCheck, err = getLastCheck(n.Settings)
 	if err != nil {
 		log.Fatalf("error occured getting lastCheck date: %v", err)
 	}
@@ -74,7 +70,7 @@ func (n *Notifier) checkSpotifyAndPostToSlack(now time.Time) {
 			}
 		}
 	}
-	err = setLastCheck(now.UTC())
+	err = setLastCheck(now.UTC(), n.Settings)
 	if err != nil {
 		log.Fatalf("error setting last check time: %v", err)
 	}

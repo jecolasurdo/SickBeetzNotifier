@@ -5,3 +5,4 @@ vendor/
 .spotifytoken
 .lastcheck
 rundocker.sh
+.DS_Store

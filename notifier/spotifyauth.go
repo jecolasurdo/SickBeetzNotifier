@@ -12,10 +12,6 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const (
-	spotifyTokenFileName = ".spotifytoken"
-)
-
 var (
 	auth  spotify.Authenticator
 	ch    = make(chan *spotify.Client)
@@ -28,7 +24,7 @@ var (
 // If no token is found locally, the user is prompted to authorize at a URL.
 // The method blocks until authorization is complete.
 func Authorize(s *Settings) *spotify.Client {
-	token, err := retrieveToken()
+	token, err := retrieveToken(s)
 	if err != nil {
 		log.Fatalf("error checking for existing token: %v", err)
 	}
@@ -39,7 +35,7 @@ func Authorize(s *Settings) *spotify.Client {
 		return &client
 	}
 	auth = spotify.NewAuthenticator(s.SpotifyRedirectURI, spotify.ScopePlaylistReadCollaborative)
-	http.HandleFunc("/callback", completeAuth)
+	http.Handle("/callback", newAuthCompleter(s))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		log.Println("Got request for:", r.URL.String())
 	})
@@ -49,7 +45,37 @@ func Authorize(s *Settings) *spotify.Client {
 	return <-ch
 }
 
-func completeAuth(w http.ResponseWriter, r *http.Request) {
+func retrieveToken(s *Settings) (*oauth2.Token, error) {
+	var (
+		err             error
+		serializedToken []byte
+		token           oauth2.Token
+	)
+	_, err = os.Stat(s.SpotifyTokenFile())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if serializedToken, err = ioutil.ReadFile(s.SpotifyTokenFile()); err == nil {
+		err = json.Unmarshal(serializedToken, &token)
+	}
+
+	return &token, err
+}
+
+type authCompleter struct {
+	Settings *Settings
+}
+
+func newAuthCompleter(settings *Settings) *authCompleter {
+	return &authCompleter{
+		Settings: settings,
+	}
+}
+
+func (a *authCompleter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	tok, err := auth.Token(state, r)
 	if err != nil {
 		http.Error(w, "Couldn't get token", http.StatusForbidden)
@@ -61,7 +87,7 @@ func completeAuth(w http.ResponseWriter, r *http.Request) {
 	}
 	spotifyClient := auth.NewClient(tok)
 
-	err = saveToken(tok)
+	err = a.saveToken(tok)
 	if err != nil {
 		log.Fatalf("error trying to save token for later use:, %v", err)
 	}
@@ -70,33 +96,13 @@ func completeAuth(w http.ResponseWriter, r *http.Request) {
 	ch <- &spotifyClient
 }
 
-func retrieveToken() (*oauth2.Token, error) {
-	var (
-		err             error
-		serializedToken []byte
-		token           oauth2.Token
-	)
-	_, err = os.Stat(spotifyTokenFileName)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	if serializedToken, err = ioutil.ReadFile(spotifyTokenFileName); err == nil {
-		err = json.Unmarshal(serializedToken, &token)
-	}
-
-	return &token, err
-}
-
-func saveToken(token *oauth2.Token) error {
+func (a *authCompleter) saveToken(token *oauth2.Token) error {
 	var (
 		err             error
 		f               *os.File
 		serializedToken []byte
 	)
-	if f, err = os.Create(spotifyTokenFileName); err == nil {
+	if f, err = os.Create(a.Settings.SpotifyTokenFile()); err == nil {
 		if serializedToken, err = json.Marshal(*token); err == nil {
 			_, err = f.Write(serializedToken)
 		}

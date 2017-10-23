@@ -8,6 +8,7 @@ import (
 
 // Settings represents the core settings required for the application to integrate with Slack and Spotify
 type Settings struct {
+	FilePath             string `required:"true" split_words:"true"`
 	SlackBotName         string `required:"true" split_words:"true"`
 	SlackChannelName     string `required:"true" split_words:"true"`
 	SlackToken           string `required:"true" split_words:"true"`
@@ -27,4 +28,16 @@ func InitializeSettingsFromEnvVars() *Settings {
 		log.Fatal(err)
 	}
 	return &s
+}
+
+// LastCheckFile returns the fully qualified name of the last-check file.
+// The last-check file stores the time that the Spotify playlist was last checked
+func (s *Settings) LastCheckFile() string {
+	return s.FilePath + ".lastcheck"
+}
+
+// SpotifyTokenFile returns the fully qualified name of the spotify token file.
+// The Spotify token file contains the current oauth token.
+func (s *Settings) SpotifyTokenFile() string {
+	return s.FilePath + ".spotifytoken"
 }
